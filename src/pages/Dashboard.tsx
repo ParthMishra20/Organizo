@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Task } from '../types';
 import { format } from 'date-fns';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react';
+import { ObjectId } from 'mongodb';
 import toast from 'react-hot-toast';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../components/AuthProvider';
+import { Task, getCollection, convertDocument } from '../lib/mongodb';
 
 export default function Dashboard() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const { user } = useAuth();
+  const { user } = useUser();
 
   useEffect(() => {
     if (user) {
@@ -20,41 +20,48 @@ export default function Dashboard() {
   const fetchTasks = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false });
+    try {
+      const tasksCollection = await getCollection('tasks');
+      const rawTasks = await tasksCollection
+        .find({ userId: user.id })
+        .sort({ date: -1 })
+        .toArray();
 
-    if (error) {
+      setTasks(rawTasks.map(doc => convertDocument<Task>(doc)));
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
       toast.error('Failed to fetch tasks');
-      return;
     }
-
-    setTasks(data || []);
   };
 
-  const toggleTaskCompletion = async (taskId: string) => {
+  const toggleTaskCompletion = async (taskId: ObjectId) => {
     if (!user) return;
 
-    const task = tasks.find(t => t.id === taskId);
+    const task = tasks.find(t => t._id?.toString() === taskId.toString());
     if (!task) return;
 
-    const { error } = await supabase
-      .from('tasks')
-      .update({ completed: !task.completed })
-      .eq('id', taskId)
-      .eq('user_id', user.id);
+    try {
+      const tasksCollection = await getCollection('tasks');
+      await tasksCollection.updateOne(
+        { _id: taskId, userId: user.id },
+        {
+          $set: {
+            completed: !task.completed,
+            updatedAt: new Date()
+          }
+        }
+      );
 
-    if (error) {
+      setTasks(tasks.map(t =>
+        t._id?.toString() === taskId.toString()
+          ? { ...t, completed: !t.completed, updatedAt: new Date() }
+          : t
+      ));
+      toast.success('Task status updated!');
+    } catch (error) {
+      console.error('Error updating task:', error);
       toast.error('Failed to update task');
-      return;
     }
-
-    setTasks(tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
-    ));
-    toast.success('Task status updated!');
   };
 
   const todayTasks = tasks.filter(
@@ -96,7 +103,7 @@ export default function Dashboard() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            toggleTaskCompletion(task.id);
+            toggleTaskCompletion(task._id as ObjectId);
           }}
           className={`flex items-center ${
             task.completed
@@ -130,9 +137,9 @@ export default function Dashboard() {
           {todayTasks.length > 0 ? (
             todayTasks.map(task => (
               <TaskCard
-                key={task.id}
+                key={task._id?.toString()}
                 task={task}
-                expanded={selectedTask?.id === task.id}
+                expanded={selectedTask?._id?.toString() === task._id?.toString()}
               />
             ))
           ) : (
@@ -151,9 +158,9 @@ export default function Dashboard() {
           {tasks.length > 0 ? (
             tasks.map(task => (
               <TaskCard
-                key={task.id}
+                key={task._id?.toString()}
                 task={task}
-                expanded={selectedTask?.id === task.id}
+                expanded={selectedTask?._id?.toString() === task._id?.toString()}
               />
             ))
           ) : (

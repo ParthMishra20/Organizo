@@ -1,121 +1,122 @@
 import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { Sun, Moon, LayoutDashboard, Calendar, Wallet, User } from 'lucide-react';
-import { useAuth } from './AuthProvider';
-import { signOut } from '../lib/supabase';
+import { Menu, X, Moon, Sun, Home, User, Calendar, Wallet } from 'lucide-react';
+import { useNavigation } from '../context/NavigationContext';
+import { useTheme } from '../context/ThemeContext';
+import { darkModeClass } from '../hooks/useDarkMode';
 
-interface NavbarProps {
-  darkMode?: boolean;
-  toggleDarkMode?: () => void;
-}
+const navigationItems = [
+  { path: '/', label: 'Home', icon: <Home size={20} /> },
+  { path: '/profile', label: 'Profile', icon: <User size={20} /> },
+  { path: '/tasks', label: 'Tasks', icon: <Calendar size={20} /> },
+  { path: '/budget', label: 'Budget', icon: <Wallet size={20} /> },
+];
 
-export default function Navbar({ darkMode, toggleDarkMode }: NavbarProps) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
+export default function Navbar() {
+  const { currentPath, navigate, isMobileMenuOpen, toggleMobileMenu } = useNavigation();
+  const { theme, setTheme } = useTheme();
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      navigate('/sign-in');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   return (
-    <nav className="bg-white dark:bg-gray-800 shadow-md">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center space-x-8">
-            <NavLink to="/" className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+    <nav className={darkModeClass(
+      "sticky top-0 z-40 w-full border-b",
+      "bg-background border-gray-200",
+      "bg-gray-900 border-gray-800"
+    )}>
+      <div className="container mx-auto px-4">
+        <div className="flex h-16 items-center justify-between">
+          {/* Logo */}
+          <div className="flex items-center">
+            <button
+              onClick={() => navigate('/')}
+              className="text-xl font-bold tracking-tight hover:opacity-80"
+            >
               Organizo
-            </NavLink>
-            {user && (
-              <>
-                <NavLink
-                  to="/dashboard"
-                  className={({ isActive }) =>
-                    `flex items-center space-x-2 ${
-                      isActive
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : 'text-gray-600 dark:text-gray-300'
-                    }`
-                  }
-                >
-                  <LayoutDashboard size={20} />
-                  <span>Dashboard</span>
-                </NavLink>
-                <NavLink
-                  to="/scheduler"
-                  className={({ isActive }) =>
-                    `flex items-center space-x-2 ${
-                      isActive
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : 'text-gray-600 dark:text-gray-300'
-                    }`
-                  }
-                >
-                  <Calendar size={20} />
-                  <span>Task Scheduler</span>
-                </NavLink>
-                <NavLink
-                  to="/budget"
-                  className={({ isActive }) =>
-                    `flex items-center space-x-2 ${
-                      isActive
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : 'text-gray-600 dark:text-gray-300'
-                    }`
-                  }
-                >
-                  <Wallet size={20} />
-                  <span>Budget Buddy</span>
-                </NavLink>
-              </>
-            )}
+            </button>
           </div>
-          <div className="flex items-center space-x-4">
-            {toggleDarkMode && (
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-4">
+            {navigationItems.map(({ path, label, icon }) => (
               <button
-                onClick={toggleDarkMode}
-                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700"
+                key={path}
+                onClick={() => navigate(path)}
+                className={darkModeClass(
+                  "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  currentPath === path
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-gray-100 hover:text-gray-900",
+                  currentPath === path
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-gray-800 hover:text-gray-50"
+                )}
               >
-                {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+                {icon}
+                <span className="ml-2">{label}</span>
               </button>
-            )}
-            {user ? (
-              <div className="flex items-center space-x-4">
-                <NavLink
-                  to="/profile"
-                  className={({ isActive }) =>
-                    `flex items-center space-x-2 ${
-                      isActive
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : 'text-gray-600 dark:text-gray-300'
-                    }`
-                  }
-                >
-                  <User size={20} />
-                  <span>{user.email?.split('@')[0] || 'Profile'}</span>
-                </NavLink>
-                <button
-                  onClick={handleSignOut}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <NavLink
-                to="/sign-in"
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
-              >
-                Sign In
-              </NavLink>
-            )}
+            ))}
+          </div>
+
+          {/* Theme Toggle & Mobile Menu Button */}
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={toggleTheme}
+              className={darkModeClass(
+                "p-2 rounded-md transition-colors",
+                "hover:bg-gray-100",
+                "hover:bg-gray-800"
+              )}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+
+            <button
+              onClick={toggleMobileMenu}
+              className="md:hidden p-2 rounded-md transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+              aria-label="Toggle mobile menu"
+              aria-expanded={isMobileMenuOpen}
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile Navigation */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden">
+          <div className={darkModeClass(
+            "px-2 pt-2 pb-3 space-y-1",
+            "bg-background",
+            "bg-gray-900"
+          )}>
+            {navigationItems.map(({ path, label, icon }) => (
+              <button
+                key={path}
+                onClick={() => {
+                  navigate(path);
+                  toggleMobileMenu();
+                }}
+                className={darkModeClass(
+                  "flex w-full items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                  currentPath === path
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-gray-100 hover:text-gray-900",
+                  currentPath === path
+                    ? "bg-primary text-primary-foreground"
+                    : "hover:bg-gray-800 hover:text-gray-50"
+                )}
+              >
+                {icon}
+                <span className="ml-2">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

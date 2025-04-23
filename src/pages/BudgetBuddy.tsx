@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Transaction, Budget } from '../types';
 import { format, isFirstDayOfMonth, addMonths } from 'date-fns';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Plus, ArrowUpRight, ArrowDownRight, ArrowRight } from 'lucide-react';
+import { useUser } from '@clerk/clerk-react';
+import { ObjectId } from 'mongodb';
 import Modal from '../components/Modal';
 import TransactionForm from '../components/TransactionForm';
 import InitialBudgetModal from '../components/InitialBudgetModal';
 import toast from 'react-hot-toast';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../components/AuthProvider';
+import { Transaction, Budget, getCollection, convertDocument } from '../lib/mongodb';
 
 export default function BudgetBuddy() {
   const [budget, setBudget] = useState<Budget | null>(null);
@@ -17,7 +17,7 @@ export default function BudgetBuddy() {
   const [isInitialSetupOpen, setIsInitialSetupOpen] = useState(false);
   const [transactionType, setTransactionType] = useState<'spend' | 'receive' | 'invest'>('spend');
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
-  const { user } = useAuth();
+  const { user } = useUser();
 
   useEffect(() => {
     if (user) {
@@ -29,123 +29,125 @@ export default function BudgetBuddy() {
   const fetchBudget = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('budgets')
-      .select('*')
-      .eq('user_id', user.id)
-      .single();
+    try {
+      const budgetsCollection = await getCollection('budgets');
+      const data = await budgetsCollection.findOne({ userId: user.id });
 
-    if (error) {
-      console.error('Error fetching budget:', error);
-      toast.error('Failed to fetch budget');
-      return;
-    }
+      if (data) {
+        setBudget(convertDocument<Budget>(data));
 
-    if (data) {
-      setBudget({
-        currentBudget: data.current_budget,
-        monthlyIncome: data.monthly_income,
-        lastUpdated: data.last_updated,
-        isInitialized: data.is_initialized
-      });
-
-      if (!data.is_initialized) {
+        if (!data.isInitialized) {
+          setIsInitialSetupOpen(true);
+        }
+      } else {
+        // Create initial budget record if it doesn't exist
+        const initialBudget = {
+          userId: user.id,
+          currentBudget: 0,
+          monthlyIncome: 0,
+          lastUpdated: new Date().toISOString().split('T')[0],
+          isInitialized: false
+        };
+        
+        await budgetsCollection.insertOne(initialBudget);
+        setBudget(initialBudget);
         setIsInitialSetupOpen(true);
       }
+    } catch (error) {
+      console.error('Error fetching budget:', error);
+      toast.error('Failed to fetch budget');
     }
   };
 
   const handleInitialSetup = async (monthlyIncome: number) => {
-    if (!user) return;
+    if (!user || !budget) return;
 
-    const { error } = await supabase
-      .from('budgets')
-      .update({
-        monthly_income: monthlyIncome,
-        current_budget: monthlyIncome,
-        is_initialized: true,
-        last_updated: new Date().toISOString().split('T')[0]
-      })
-      .eq('user_id', user.id);
+    try {
+      const budgetsCollection = await getCollection('budgets');
+      await budgetsCollection.updateOne(
+        { userId: user.id },
+        {
+          $set: {
+            monthlyIncome,
+            currentBudget: monthlyIncome,
+            isInitialized: true,
+            lastUpdated: new Date().toISOString().split('T')[0]
+          }
+        }
+      );
 
-    if (error) {
+      await fetchBudget();
+      setIsInitialSetupOpen(false);
+      toast.success('Budget initialized successfully!');
+    } catch (error) {
       console.error('Error initializing budget:', error);
       toast.error('Failed to set up initial budget');
-      return;
     }
-
-    await fetchBudget();
-    setIsInitialSetupOpen(false);
-    toast.success('Budget initialized successfully!');
   };
 
   const fetchTransactions = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false });
-
-    if (error) {
+    try {
+      const transactionsCollection = await getCollection('transactions');
+      const rawTransactions = await transactionsCollection
+        .find({ userId: user.id })
+        .sort({ date: -1 })
+        .toArray();
+      
+      setTransactions(rawTransactions.map(doc => convertDocument<Transaction>(doc)));
+    } catch (error) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to fetch transactions');
-      return;
     }
-
-    setTransactions(data || []);
   };
 
-  const handleAddTransaction = async (data: Omit<Transaction, 'id'>) => {
+  const handleAddTransaction = async (data: Omit<Transaction, '_id' | 'userId' | 'createdAt'>) => {
     if (!budget || !user) return;
 
-    const newTransaction = {
-      ...data,
-      user_id: user.id,
-    };
+    try {
+      const transactionsCollection = await getCollection('transactions');
+      const budgetsCollection = await getCollection('budgets');
 
-    const { error: transactionError } = await supabase
-      .from('transactions')
-      .insert([newTransaction]);
+      const newTransaction = {
+        ...data,
+        userId: user.id,
+        createdAt: new Date()
+      };
 
-    if (transactionError) {
-      console.error('Error adding transaction:', transactionError);
+      await transactionsCollection.insertOne(newTransaction);
+
+      const newBudgetAmount =
+        data.type === 'spend'
+          ? budget.currentBudget - data.amount
+          : data.type === 'receive'
+          ? budget.currentBudget + data.amount
+          : budget.currentBudget - data.amount;
+
+      await budgetsCollection.updateOne(
+        { userId: user.id },
+        {
+          $set: {
+            currentBudget: newBudgetAmount,
+            lastUpdated: new Date().toISOString().split('T')[0]
+          }
+        }
+      );
+
+      await fetchTransactions();
+      await fetchBudget();
+      setIsModalOpen(false);
+      toast.success('Transaction added successfully!');
+    } catch (error) {
+      console.error('Error adding transaction:', error);
       toast.error('Failed to add transaction');
-      return;
     }
-
-    const newBudgetAmount =
-      data.type === 'spend'
-        ? budget.currentBudget - data.amount
-        : data.type === 'receive'
-        ? budget.currentBudget + data.amount
-        : budget.currentBudget - data.amount;
-
-    const { error: budgetError } = await supabase
-      .from('budgets')
-      .update({
-        current_budget: newBudgetAmount,
-        last_updated: new Date().toISOString().split('T')[0]
-      })
-      .eq('user_id', user.id);
-
-    if (budgetError) {
-      console.error('Error updating budget:', budgetError);
-      toast.error('Failed to update budget');
-      return;
-    }
-
-    fetchTransactions();
-    fetchBudget();
-    setIsModalOpen(false);
-    toast.success('Transaction added successfully!');
   };
 
   const handleUpdateIncome = async () => {
     if (!budget || !user) return;
 
-    const canUpdateIncome = isFirstDayOfMonth(new Date()) && 
+    const canUpdateIncome = isFirstDayOfMonth(new Date()) &&
       format(new Date(budget.lastUpdated), 'yyyy-MM') !== format(new Date(), 'yyyy-MM');
 
     if (!canUpdateIncome) {
@@ -154,22 +156,24 @@ export default function BudgetBuddy() {
       return;
     }
 
-    const { error } = await supabase
-      .from('budgets')
-      .update({
-        current_budget: budget.currentBudget + budget.monthlyIncome,
-        last_updated: new Date().toISOString().split('T')[0]
-      })
-      .eq('user_id', user.id);
+    try {
+      const budgetsCollection = await getCollection('budgets');
+      await budgetsCollection.updateOne(
+        { userId: user.id },
+        {
+          $set: {
+            currentBudget: budget.currentBudget + budget.monthlyIncome,
+            lastUpdated: new Date().toISOString().split('T')[0]
+          }
+        }
+      );
 
-    if (error) {
+      await fetchBudget();
+      toast.success('Monthly income added successfully!');
+    } catch (error) {
       console.error('Error updating income:', error);
       toast.error('Failed to update income');
-      return;
     }
-
-    fetchBudget();
-    toast.success('Monthly income added successfully!');
   };
 
   if (!budget) {
@@ -356,7 +360,7 @@ export default function BudgetBuddy() {
           {transactions.length > 0 ? (
             transactions.map(transaction => (
               <div
-                key={transaction.id}
+                key={transaction._id ? transaction._id.toString() : undefined}
                 className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg transition-all duration-300 hover:shadow-md"
               >
                 <div className="flex items-center">
