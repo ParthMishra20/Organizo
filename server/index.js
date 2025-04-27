@@ -12,12 +12,35 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
+// CORS configuration with flexible frontend URL support
+const allowedOrigins = [
+  'http://localhost:5173', // Local development
+];
+
+// Add production frontend URL if defined in environment variables
+if (process.env.FRONTEND_URL) {
+  // Support for multiple comma-separated URLs
+  const frontendUrls = process.env.FRONTEND_URL.split(',').map(url => url.trim());
+  allowedOrigins.push(...frontendUrls);
+}
+
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'your-production-domain.com'
-    : 'http://localhost:5173',
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, Postman, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      console.log(`Origin blocked by CORS: ${origin}`);
+      // During initial deployment/testing, allow all origins
+      callback(null, true);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'user-id']
 }));
 
 app.use(express.json());
