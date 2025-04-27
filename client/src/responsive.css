@@ -78,6 +78,38 @@
   .chakra-slide {
     transition: transform 0.3s ease !important;
   }
+  
+  /* Auth page specific responsive fixes */
+  .cl-rootBox {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .cl-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 1rem !important;
+  }
+  
+  .cl-formButtonPrimary,
+  .cl-socialButtonsBlockButton {
+    height: 48px !important;
+  }
+  
+  .cl-socialButtons {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+  
+  .cl-internal-b3fm6y {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  /* Fix padding in auth card layout */
+  .auth-card {
+    padding: 1rem !important;
+  }
 }
 
 /* iPhone SE / Small device specific fixes */
@@ -93,5 +125,14 @@
   .chakra-container {
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
+  }
+  
+  /* Even smaller padding for auth card on tiny screens */
+  .cl-card {
+    padding: 0.75rem !important;
+  }
+  
+  .cl-formFieldInput {
+    font-size: 14px !important;
   }
 }

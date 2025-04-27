@@ -58,8 +58,8 @@ const AuthLayout = ({ children }) => {
       display="flex"
       alignItems="center"
       justifyContent="center"
-      py={8}
-      px={4}
+      py={{ base: 4, md: 8 }}
+      px={{ base: 2, md: 4 }}
       position="relative"
     >
       {/* Color Mode Toggle */}
@@ -73,25 +73,26 @@ const AuthLayout = ({ children }) => {
         aria-label="Toggle color mode"
       />
 
-      <Container maxW="container.lg">
+      <Container maxW={{ base: "100%", md: "container.lg" }}>
         <AnimatedBox>
           <Card
-            p={8}
+            p={{ base: 4, md: 8 }}
             boxShadow="xl"
             border="1px solid"
             borderColor={useColorModeValue('gray.200', 'gray.700')}
             _hover={{ transform: 'none' }}
+            className="auth-card"
           >
             <Grid 
               templateColumns={{ base: '1fr', md: '1fr 1fr' }} 
-              gap={8}
+              gap={{ base: 6, md: 8 }}
               alignItems="center"
             >
               {/* Left side - Features */}
-              <VStack spacing={6} align="stretch">
+              <VStack spacing={6} align="stretch" display={{ base: 'none', md: 'flex' }}>
                 <VStack spacing={2} align="start">
                   <Heading 
-                    size="xl" 
+                    size={{ base: "lg", md: "xl" }} 
                     bgGradient="linear(to-r, brand.500, purple.500)" 
                     bgClip="text"
                   >
@@ -109,8 +110,20 @@ const AuthLayout = ({ children }) => {
                 </VStack>
               </VStack>
 
+              {/* Mobile Welcome Text */}
+              <VStack spacing={2} align="center" display={{ base: 'flex', md: 'none' }} mb={4}>
+                <Heading 
+                  size="lg" 
+                  bgGradient="linear(to-r, brand.500, purple.500)" 
+                  bgClip="text"
+                  textAlign="center"
+                >
+                  Welcome to Organizo
+                </Heading>
+              </VStack>
+
               {/* Right side - Auth Form */}
-              <Box>
+              <Box w="100%">
                 {children}
               </Box>
             </Grid>
