@@ -25,16 +25,34 @@ import {
   useColorModeValue,
   SimpleGrid,
   TableContainer,
+  IconButton,
+  Tooltip,
+  Container,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import useErrorHandler from '../../hooks/useErrorHandler';
-import { FaMoneyBillWave, FaChartPie, FaHandHoldingUsd } from 'react-icons/fa';
+import { FaMoneyBillWave, FaChartPie, FaHandHoldingUsd, FaEdit, FaTrash, FaExclamationCircle } from 'react-icons/fa';
 import { getTransactions, createTransaction } from '../../utils/supabase';
 import Card from '../shared/Card';
 import StyledBadge from '../shared/StyledBadge';
-import AnimatedBox, { ListAnimation } from '../shared/AnimatedBox';
+import AnimatedBox from '../shared/AnimatedBox';
 import { formatCurrency, getTransactionTags, getTagColor } from '../../utils/formatters';
+
+// Animation component for list items
+const ListAnimation = ({ children, index }) => {
+  return (
+    <Box
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
+    >
+      {children}
+    </Box>
+  );
+};
 
 const TransactionArea = ({ onTransactionAdd }) => {
   const [loading, setLoading] = useState(true);
@@ -46,7 +64,9 @@ const TransactionArea = ({ onTransactionAdd }) => {
     description: '',
     tag: ''
   });
-
+  const [selectedTransactionId, setSelectedTransactionId] = useState(null);
+  const [isSlowConnection, setIsSlowConnection] = useState(false);
+  
   const { handleError, showSuccess } = useErrorHandler();
   const { user } = useUser();
   const tableHeaderBg = useColorModeValue('gray.50', 'gray.700');
@@ -55,6 +75,18 @@ const TransactionArea = ({ onTransactionAdd }) => {
 
   useEffect(() => {
     fetchTransactions();
+    
+    // Add slow connection detection
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        setIsSlowConnection(true);
+      }
+    }, 5000);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      setIsSlowConnection(false);
+    };
   }, [user]);
 
   const fetchTransactions = async () => {
@@ -137,15 +169,25 @@ const TransactionArea = ({ onTransactionAdd }) => {
       handleError(error);
     }
   };
+  
+  const handleTransactionSelect = (transactionId) => {
+    setSelectedTransactionId(transactionId === selectedTransactionId ? null : transactionId);
+  };
 
   if (loading) {
     return (
-      <Card>
+      <Container centerContent py={8}>
         <VStack spacing={4}>
           <Spinner size="xl" color="brand.500" />
           <Text>Loading transactions...</Text>
+          {isSlowConnection && (
+            <Alert status="info" borderRadius="md">
+              <AlertIcon />
+              <Text fontSize="sm">This is taking longer than usual. Please wait...</Text>
+            </Alert>
+          )}
         </VStack>
-      </Card>
+      </Container>
     );
   }
 
@@ -239,85 +281,103 @@ const TransactionArea = ({ onTransactionAdd }) => {
           </TabPanels>
         </Tabs>
 
-        {/* Transaction History */}
+        {/* Transaction History - Matching TaskManager styling */}
         <VStack spacing={4} align="stretch">
           <Heading size="md">Transaction History</Heading>
+          
           <Box
             borderRadius="lg"
             borderWidth="1px"
-            borderColor={tableBorderColor}
             overflow="hidden"
+            role="grid"
+            tabIndex={0}
+            onFocus={() => {
+              // Auto-select first transaction if none selected
+              if (transactions.length && !selectedTransactionId) {
+                handleTransactionSelect(transactions[0].id);
+              }
+            }}
           >
-            <TableContainer maxH="600px" overflowY="auto">
-              <Table variant="simple" size="md" position="relative">
-                <Thead
-                  position="sticky"
-                  top={0}
-                  bg={tableHeaderBg}
-                  zIndex={1}
-                  boxShadow="0 1px 2px rgba(0,0,0,0.1)"
-                >
+            <Table variant="simple">
+              <Thead bg={useColorModeValue('gray.50', 'gray.700')}>
+                <Tr>
+                  <Th py={4} px={6} textAlign="left" width="20%">Date</Th>
+                  <Th py={4} px={6} textAlign="center" width="15%">Type</Th>
+                  <Th py={4} px={6} textAlign="left" width="25%">Description</Th>
+                  <Th py={4} px={6} textAlign="right" width="20%">Amount</Th>
+                  <Th py={4} px={6} textAlign="center" width="20%">Category</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {transactions.length === 0 ? (
                   <Tr>
-                    <Th width="15%" textAlign="center" px={6} py={4}>Date</Th>
-                    <Th width="15%" textAlign="center" px={6} py={4}>Type</Th>
-                    <Th width="35%" textAlign="center" px={6} py={4}>Description</Th>
-                    <Th width="20%" textAlign="center" px={6} py={4}>Amount</Th>
-                    <Th width="15%" textAlign="center" px={6} py={4}>Category</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                  {transactions.length === 0 ? (
-                    <Tr>
-                      <Td colSpan={5} textAlign="center" py={8}>
+                    <Td colSpan={5} textAlign="center" py={8}>
+                      <VStack spacing={3}>
+                        <Icon
+                          as={FaMoneyBillWave}
+                          boxSize={8}
+                          color="gray.400"
+                        />
                         <Text color="gray.500">No transactions found</Text>
+                        <Text color="gray.400" fontSize="sm">
+                          Add your first transaction using the form above
+                        </Text>
+                      </VStack>
+                    </Td>
+                  </Tr>
+                ) : (
+                  transactions.map((transaction) => (
+                    <Tr
+                      key={transaction.id}
+                      data-transaction-id={transaction.id}
+                      onClick={() => handleTransactionSelect(transaction.id)}
+                      cursor="pointer"
+                      _hover={{
+                        bg: useColorModeValue('gray.50', 'gray.700'),
+                      }}
+                      bg={
+                        selectedTransactionId === transaction.id
+                          ? useColorModeValue('gray.100', 'gray.600')
+                          : 'transparent'
+                      }
+                    >
+                      <Td py={4} px={6}>
+                        {new Date(transaction.date).toLocaleDateString()}
+                      </Td>
+                      <Td py={4} px={6} textAlign="center">
+                        <StyledBadge type={transaction.type}>
+                          {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+                        </StyledBadge>
+                      </Td>
+                      <Td py={4} px={6}>
+                        {transaction.description}
+                      </Td>
+                      <Td py={4} px={6} textAlign="right">
+                        <Text
+                          fontWeight="semibold"
+                          color={
+                            transaction.type === 'receive' ? 'green.500' :
+                            transaction.type === 'invest' ? 'blue.500' :
+                            'red.500'
+                          }
+                        >
+                          {transaction.type === 'spend' || transaction.type === 'invest' ? '- ' : '+ '}
+                          {formatCurrency(transaction.amount)}
+                        </Text>
+                      </Td>
+                      <Td py={4} px={6} textAlign="center">
+                        <StyledBadge type={getTagColor(transaction.tag)}>
+                          {transaction.tag
+                            ? transaction.tag.charAt(0).toUpperCase() + transaction.tag.slice(1)
+                            : '-'
+                          }
+                        </StyledBadge>
                       </Td>
                     </Tr>
-                  ) : (
-                    transactions.map((transaction, index) => (
-                      <ListAnimation key={transaction.id} index={index}>
-                        <Tr
-                          _hover={{ bg: tableRowHoverBg }}
-                          transition="background-color 0.2s"
-                        >
-                          <Td textAlign="center" px={6} py={4}>
-                            {new Date(transaction.date).toLocaleDateString('en-IN')}
-                          </Td>
-                          <Td textAlign="center" px={6} py={4}>
-                            <StyledBadge type={transaction.type}>
-                              {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                            </StyledBadge>
-                          </Td>
-                          <Td textAlign="center" px={6} py={4}>
-                            {transaction.description}
-                          </Td>
-                          <Td textAlign="center" px={6} py={4}>
-                            <Text
-                              color={
-                                transaction.type === 'receive' ? 'green.500' :
-                                transaction.type === 'invest' ? 'blue.500' :
-                                'red.500'
-                              }
-                              fontWeight="semibold"
-                            >
-                              {transaction.type === 'spend' || transaction.type === 'invest' ? '- ' : '+ '}
-                              {formatCurrency(transaction.amount)}
-                            </Text>
-                          </Td>
-                          <Td textAlign="center" px={6} py={4}>
-                            <StyledBadge type={getTagColor(transaction.tag)}>
-                              {transaction.tag ?
-                                transaction.tag.charAt(0).toUpperCase() + transaction.tag.slice(1)
-                                : '-'
-                              }
-                            </StyledBadge>
-                          </Td>
-                        </Tr>
-                      </ListAnimation>
-                    ))
-                  )}
-                </Tbody>
-              </Table>
-            </TableContainer>
+                  ))
+                )}
+              </Tbody>
+            </Table>
           </Box>
         </VStack>
       </VStack>

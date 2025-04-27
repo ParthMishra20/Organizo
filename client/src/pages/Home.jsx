@@ -32,14 +32,15 @@ import {
 } from '@chakra-ui/react';
 import { useState, useEffect, useCallback } from 'react';
 import { FaChartLine, FaTasks, FaBullseye, FaArrowUp, FaArrowDown, FaSync } from 'react-icons/fa';
-import { EditIcon } from '@chakra-ui/icons';
+import { EditIcon, CheckIcon } from '@chakra-ui/icons';
 import { useUser } from '@clerk/clerk-react';
 import AnimatedBox, { ListAnimation } from '../components/shared/AnimatedBox';
 import Card from '../components/shared/Card';
 import StyledBadge from '../components/shared/StyledBadge';
 import LineChart from '../components/shared/LineChart';
-import { getTasks, getTransactions } from '../utils/supabase';
+import { getTasks, getTransactions, updateTask } from '../utils/supabase';
 import { formatCurrency } from '../utils/formatters';
+import useErrorHandler from '../hooks/useErrorHandler';
 
 const Home = () => {
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,7 @@ const Home = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
   const { user } = useUser();
+  const { handleError, showSuccess } = useErrorHandler();
 
   const calculateDayBalance = (transactions, date) => {
     return transactions
@@ -89,7 +91,7 @@ const Home = () => {
       // Fetch tasks due today
       const tasks = await getTasks();
       const today = new Date().toISOString().split('T')[0];
-      const todaysTasks = tasks.filter(task => task.date === today);
+      const todaysTasks = tasks.filter(task => task.date === today && !task.completed);
       setTodaysTasks(todaysTasks);
 
       // Fetch transactions and calculate balances
@@ -168,6 +170,26 @@ const Home = () => {
     });
   }, [newGoal, onClose, toast]);
 
+  const handleToggleComplete = async (task) => {
+    try {
+      // Update task in the database
+      const updatedTask = await updateTask(task.id, { completed: !task.completed });
+      
+      // Update in local state
+      setTodaysTasks(prev => 
+        prev.map(t => t.id === task.id ? updatedTask : t)
+          .filter(t => !t.completed) // Remove completed tasks from today's tasks
+      );
+      
+      showSuccess(
+        'Task Completed',
+        'Great job completing the task! It has been moved to completed tasks.'
+      );
+    } catch (error) {
+      handleError(error, 'Error updating task');
+    }
+  };
+
   const goalProgress = (currentBalance / balanceGoal) * 100;
   const balanceChange = currentBalance - previousBalance;
   const percentChange = previousBalance !== 0 
@@ -208,12 +230,22 @@ const Home = () => {
         {/* Overview Cards */}
         <AnimatedBox delay={0.1}>
           <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-            {/* Balance Card */}
+            {/* Today's Tasks Card */}
             <Card animate>
               <VStack align="stretch" spacing={4}>
                 <HStack justify="space-between">
                   <Heading size="md">Today's Tasks</Heading>
-                  <Icon as={FaTasks} boxSize={6} color="blue.500" />
+                  <HStack>
+                    <IconButton
+                      icon={<FaSync />}
+                      isLoading={refreshing}
+                      onClick={handleRefresh}
+                      aria-label="Refresh tasks"
+                      variant="ghost"
+                      size="sm"
+                    />
+                    <Icon as={FaTasks} boxSize={6} color="blue.500" />
+                  </HStack>
                 </HStack>
                 <VStack align="stretch" spacing={3}>
                   {todaysTasks.length > 0 ? (
@@ -223,13 +255,21 @@ const Home = () => {
                           p={3}
                           bg={useColorModeValue('gray.50', 'gray.700')}
                           borderRadius="md"
-                          opacity={task.completed ? 0.7 : 1}
-                          textDecoration={task.completed ? 'line-through' : 'none'}
+                          justify="space-between"
                         >
                           <Text flex="1">{task.name}</Text>
-                          <StyledBadge type={task.priority}>
-                            {task.priority}
-                          </StyledBadge>
+                          <HStack>
+                            <StyledBadge type={task.priority}>
+                              {task.priority}
+                            </StyledBadge>
+                            <IconButton
+                              icon={<CheckIcon />}
+                              size="sm"
+                              colorScheme="green"
+                              onClick={() => handleToggleComplete(task)}
+                              aria-label="Mark as complete"
+                            />
+                          </HStack>
                         </HStack>
                       </ListAnimation>
                     ))
@@ -240,7 +280,7 @@ const Home = () => {
               </VStack>
             </Card>
 
-            {/* Monthly Goal Card */}
+            {/* Current Balance Card */}
             <Card animate>
               <VStack align="stretch" spacing={4}>
                 <HStack justify="space-between">

@@ -15,8 +15,9 @@ import {
   Divider,
   useColorModeValue,
   MenuDivider,
+  useDisclosure,
 } from '@chakra-ui/react';
-import { SunIcon, MoonIcon } from '@chakra-ui/icons';
+import { SunIcon, MoonIcon, HamburgerIcon } from '@chakra-ui/icons';
 import { Link, useLocation } from 'react-router-dom';
 import { useClerk, useUser } from '@clerk/clerk-react';
 import { motion } from 'framer-motion';
@@ -63,7 +64,7 @@ const NavLink = ({ to, children }) => {
   );
 };
 
-const Navbar = () => {
+const Navbar = ({ onSidebarOpen }) => {
   const { colorMode, toggleColorMode } = useColorMode();
   const { signOut } = useClerk();
   const { user } = useUser();
@@ -89,6 +90,18 @@ const Navbar = () => {
     >
       <Flex h={16} alignItems="center" justifyContent="space-between" maxW="container.xl" mx="auto" w="100%">
         <HStack spacing={8} alignItems="center">
+          {/* Mobile menu button */}
+          <IconButton
+            display={{ base: 'flex', md: 'none' }}
+            variant="ghost"
+            icon={<HamburgerIcon boxSize={5} />}
+            onClick={onSidebarOpen}
+            aria-label="Open Menu"
+            _hover={{
+              bg: useColorModeValue('gray.100', 'gray.700'),
+            }}
+          />
+          
           {/* Logo and Brand */}
           <Link to="/">
             <HStack spacing={2}>

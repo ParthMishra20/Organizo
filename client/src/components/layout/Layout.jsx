@@ -1,7 +1,8 @@
-import { Box, Container, useColorModeValue } from '@chakra-ui/react';
+import { Box, Container, useColorModeValue, useDisclosure } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import Navbar from './Navbar';
+import Sidebar from './Sidebar';
 
 const pageVariants = {
   initial: {
@@ -32,10 +33,16 @@ const Layout = ({ children }) => {
   const location = useLocation();
   const bgColor = useColorModeValue('gray.50', 'gray.900');
   const minH = 'calc(100vh - 64px)'; // Navbar height is 64px
+  const { isOpen, onOpen, onClose } = useDisclosure();
 
   return (
     <Box minH="100vh" bg={bgColor}>
-      <Navbar />
+      {/* Mobile Sidebar */}
+      <Sidebar isOpen={isOpen} onClose={onClose} />
+      
+      {/* Navbar with sidebar toggle */}
+      <Navbar onSidebarOpen={onOpen} />
+      
       <Box 
         as="main" 
         pt="64px" // Height of the navbar

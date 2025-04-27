@@ -23,6 +23,20 @@ const StyledBadge = ({ type, children, animate = false, ...props }) => {
           borderColor: useColorModeValue('green.100', 'green.800'),
         };
 
+      // Status badges
+      case 'brand':
+        return {
+          bg: useColorModeValue('brand.50', 'brand.900'),
+          color: useColorModeValue('brand.600', 'brand.200'),
+          borderColor: useColorModeValue('brand.100', 'brand.800'),
+        };
+      case 'success':
+        return {
+          bg: useColorModeValue('green.50', 'green.900'),
+          color: useColorModeValue('green.600', 'green.200'),
+          borderColor: useColorModeValue('green.100', 'green.800'),
+        };
+
       // Transaction type badges
       case 'spend':
         return {
