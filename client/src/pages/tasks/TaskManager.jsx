@@ -47,7 +47,9 @@ import {
   CircularProgress,
   CircularProgressLabel,
   Tooltip,
-  useColorModeValue
+  useColorModeValue,
+  Flex,
+  Badge
 } from '@chakra-ui/react';
 import { useUser } from '@clerk/clerk-react';
 import { AddIcon, CheckIcon, DeleteIcon, EditIcon } from '@chakra-ui/icons';
@@ -540,6 +542,81 @@ const TaskManager = () => {
     );
   }
 
+  // Mobile-friendly Task Card component
+  const TaskCard = ({ task }) => (
+    <Box 
+      p={4} 
+      mb={3} 
+      borderWidth="1px" 
+      borderRadius="lg"
+      onClick={() => handleTaskSelect(task.id)}
+      bg={selectedTaskId === task.id
+        ? useColorModeValue('gray.100', 'gray.600')
+        : 'transparent'
+      }
+      _hover={{
+        bg: useColorModeValue('gray.50', 'gray.700'),
+      }}
+    >
+      <Flex justifyContent="space-between" alignItems="flex-start">
+        <VStack align="start" spacing={1} flex="1">
+          <Text 
+            fontWeight="medium"
+            textDecoration={task.completed ? 'line-through' : 'none'}
+            color={task.completed ? 'gray.500' : 'inherit'}
+          >
+            {task.name || task.title}
+          </Text>
+          <HStack spacing={2} flexWrap="wrap">
+            <Text fontSize="sm" color="gray.500">
+              {new Date(task.date).toLocaleDateString()}
+            </Text>
+            {task.time && (
+              <Text fontSize="sm" color="gray.500">
+                {task.time}
+              </Text>
+            )}
+            <StyledBadge type={task.priority || 'medium'} size="sm">
+              {task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : 'Medium'}
+            </StyledBadge>
+          </HStack>
+        </VStack>
+        <HStack spacing={1}>
+          <IconButton
+            icon={<CheckIcon />}
+            colorScheme={task.completed ? 'green' : 'gray'}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleComplete(task);
+            }}
+            aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+            size="sm"
+          />
+          <IconButton
+            icon={<EditIcon />}
+            colorScheme="blue"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(task);
+            }}
+            aria-label="Edit task"
+            size="sm"
+          />
+          <IconButton
+            icon={<DeleteIcon />}
+            colorScheme="red"
+            onClick={(e) => {
+              e.stopPropagation();
+              confirmDelete(task);
+            }}
+            aria-label="Delete task"
+            size="sm"
+          />
+        </HStack>
+      </Flex>
+    </Box>
+  );
+
   const TaskTable = ({ tasks }) => (
     <Box
       borderRadius="lg"
@@ -550,6 +627,7 @@ const TaskManager = () => {
       aria-colcount={5}
       tabIndex={0}
       onKeyDown={handleArrowNavigation}
+      display={{ base: "none", md: "block" }}
       onFocus={() => {
         // Auto-select first task if none selected
         if (tasks.length && !selectedTaskId) {
@@ -650,13 +728,29 @@ const TaskManager = () => {
       </Table>
     </Box>
   );
+  
+  // Mobile view for tasks list
+  const TaskCardList = ({ tasks }) => (
+    <Box display={{ base: "block", md: "none" }}>
+      {tasks.length === 0 ? (
+        <Box textAlign="center" py={8}>
+          <VStack spacing={3}>
+            <Icon as={FaTasks} boxSize={8} color="gray.400" />
+            <Text color="gray.500">No tasks found</Text>
+          </VStack>
+        </Box>
+      ) : (
+        tasks.map((task) => <TaskCard key={task.id} task={task} />)
+      )}
+    </Box>
+  );
 
   return (
-    <Container maxW="container.xl" py={8}>
+    <Container maxW="container.xl" py={{ base: 4, md: 8 }} px={{ base: 2, md: 4 }}>
       <VStack spacing={6}>
-        <Heading>Task Manager</Heading>
+        <Heading fontSize={{ base: "xl", md: "2xl" }}>Task Manager</Heading>
         
-        <Box p={4} shadow="sm" borderWidth="1px" borderRadius="lg" width="100%">
+        <Box p={{ base: 3, md: 4 }} shadow="sm" borderWidth="1px" borderRadius="lg" width="100%">
           <VStack spacing={4}>
             <FormControl isRequired>
               <FormLabel>Task Name</FormLabel>
@@ -665,6 +759,7 @@ const TaskManager = () => {
                 value={newTask.name}
                 onChange={handleInputChange}
                 placeholder="What needs to be done?"
+                size={{ base: "md", md: "md" }}
               />
             </FormControl>
             
@@ -676,6 +771,7 @@ const TaskManager = () => {
                   name="date"
                   value={newTask.date}
                   onChange={handleInputChange}
+                  size={{ base: "md", md: "md" }}
                 />
               </FormControl>
               
@@ -686,6 +782,7 @@ const TaskManager = () => {
                   name="time"
                   value={newTask.time}
                   onChange={handleInputChange}
+                  size={{ base: "md", md: "md" }}
                 />
               </FormControl>
               
@@ -695,6 +792,7 @@ const TaskManager = () => {
                   name="priority"
                   value={newTask.priority}
                   onChange={handleInputChange}
+                  size={{ base: "md", md: "md" }}
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
@@ -708,6 +806,7 @@ const TaskManager = () => {
               onClick={handleSubmit}
               width="100%"
               isDisabled={!newTask.name || !newTask.date}
+              size={{ base: "md", md: "md" }}
             >
               Add Task
             </Button>
@@ -715,18 +814,20 @@ const TaskManager = () => {
         </Box>
         
         <Box width="100%">
-          <Tabs>
+          <Tabs isFitted variant="enclosed" colorScheme="blue">
             <TabList>
-              <Tab>Active Tasks ({activeTasks.length})</Tab>
-              <Tab>Completed Tasks ({completedTasks.length})</Tab>
+              <Tab fontSize={{ base: "sm", md: "md" }}>Active ({activeTasks.length})</Tab>
+              <Tab fontSize={{ base: "sm", md: "md" }}>Completed ({completedTasks.length})</Tab>
             </TabList>
             
             <TabPanels>
-              <TabPanel>
+              <TabPanel p={{ base: 2, md: 4 }}>
                 <TaskTable tasks={activeTasks} />
+                <TaskCardList tasks={activeTasks} />
               </TabPanel>
-              <TabPanel>
+              <TabPanel p={{ base: 2, md: 4 }}>
                 <TaskTable tasks={completedTasks} />
+                <TaskCardList tasks={completedTasks} />
               </TabPanel>
             </TabPanels>
           </Tabs>
@@ -735,7 +836,7 @@ const TaskManager = () => {
         {/* Edit Task Modal */}
         <Modal isOpen={isOpen} onClose={onClose}>
           <ModalOverlay />
-          <ModalContent>
+          <ModalContent mx={{ base: 3, md: 0 }}>
             <ModalHeader>Edit Task</ModalHeader>
             <ModalCloseButton />
             <ModalBody>
@@ -806,7 +907,7 @@ const TaskManager = () => {
           onClose={onDeleteClose}
         >
           <AlertDialogOverlay>
-            <AlertDialogContent>
+            <AlertDialogContent mx={{ base: 3, md: 0 }}>
               <AlertDialogHeader>Delete Task</AlertDialogHeader>
               <AlertDialogBody>
                 Are you sure you want to delete this task? This action cannot be undone.
@@ -826,7 +927,7 @@ const TaskManager = () => {
         {/* Keyboard Shortcuts Modal */}
         <Modal isOpen={showShortcuts} onClose={() => updateState({ showShortcuts: false })}>
           <ModalOverlay />
-          <ModalContent>
+          <ModalContent mx={{ base: 3, md: 0 }}>
             <ModalHeader>Keyboard Shortcuts</ModalHeader>
             <ModalCloseButton />
             <ModalBody>

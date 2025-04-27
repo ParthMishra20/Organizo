@@ -30,6 +30,8 @@ import {
   Container,
   Alert,
   AlertIcon,
+  Badge,
+  Flex,
 } from '@chakra-ui/react';
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
@@ -197,16 +199,66 @@ const TransactionArea = ({ onTransactionAdd }) => {
     { type: 'receive', icon: FaHandHoldingUsd, color: 'green.500' }
   ];
 
+  // Mobile transaction item renderer
+  const MobileTransactionItem = ({ transaction }) => (
+    <Box 
+      p={4} 
+      borderWidth="1px" 
+      borderRadius="lg" 
+      mb={3}
+      onClick={() => handleTransactionSelect(transaction.id)}
+      bg={selectedTransactionId === transaction.id
+        ? useColorModeValue('gray.100', 'gray.600')
+        : 'transparent'
+      }
+      _hover={{
+        bg: useColorModeValue('gray.50', 'gray.700'),
+      }}
+    >
+      <Flex justifyContent="space-between" mb={2}>
+        <Text fontWeight="medium">{transaction.description}</Text>
+        <Text
+          fontWeight="semibold"
+          color={
+            transaction.type === 'receive' ? 'green.500' :
+            transaction.type === 'invest' ? 'blue.500' :
+            'red.500'
+          }
+        >
+          {transaction.type === 'spend' || transaction.type === 'invest' ? '- ' : '+ '}
+          {formatCurrency(transaction.amount)}
+        </Text>
+      </Flex>
+      <Flex justifyContent="space-between" alignItems="center">
+        <Text fontSize="sm" color="gray.500">
+          {new Date(transaction.date).toLocaleDateString()}
+        </Text>
+        <HStack spacing={2}>
+          <StyledBadge type={transaction.type} size="sm">
+            {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
+          </StyledBadge>
+          {transaction.tag && (
+            <StyledBadge type={getTagColor(transaction.tag)} size="sm">
+              {transaction.tag.charAt(0).toUpperCase() + transaction.tag.slice(1)}
+            </StyledBadge>
+          )}
+        </HStack>
+      </Flex>
+    </Box>
+  );
+
   return (
     <Card>
       <VStack spacing={6} align="stretch">
-        <Tabs variant="enclosed" colorScheme="brand">
-          <TabList>
+        <Tabs variant="enclosed" colorScheme="brand" isLazy>
+          <TabList overflowX="auto" className="mobile-tab-list">
             {transactionTypes.map(({ type, icon: IconComponent, color }) => (
-              <Tab key={type}>
-                <HStack spacing={2}>
+              <Tab key={type} minWidth="auto" px={{ base: 3, md: 4 }}>
+                <HStack spacing={{ base: 1, md: 2 }}>
                   <Icon as={IconComponent} color={color} />
-                  <Text>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
+                  <Text display={{ base: 'none', sm: 'block' }}>
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </Text>
                 </HStack>
               </Tab>
             ))}
@@ -214,8 +266,8 @@ const TransactionArea = ({ onTransactionAdd }) => {
 
           <TabPanels>
             {transactionTypes.map(({ type }) => (
-              <TabPanel key={type} p={4}>
-                <VStack spacing={4} align="stretch">
+              <TabPanel key={type} p={{ base: 2, md: 4 }}>
+                <VStack spacing={4} align="stretch" className="transaction-form-mobile">
                   <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
                     <FormControl isRequired>
                       <FormLabel>Date</FormLabel>
@@ -224,7 +276,7 @@ const TransactionArea = ({ onTransactionAdd }) => {
                         name="date"
                         value={newTransaction.date}
                         onChange={handleInputChange}
-                        size="lg"
+                        size={{ base: "md", md: "lg" }}
                       />
                     </FormControl>
 
@@ -236,7 +288,7 @@ const TransactionArea = ({ onTransactionAdd }) => {
                         placeholder="Enter amount"
                         value={newTransaction.amount}
                         onChange={handleInputChange}
-                        size="lg"
+                        size={{ base: "md", md: "lg" }}
                       />
                     </FormControl>
                   </SimpleGrid>
@@ -248,7 +300,7 @@ const TransactionArea = ({ onTransactionAdd }) => {
                       placeholder="Enter description"
                       value={newTransaction.description}
                       onChange={handleInputChange}
-                      size="lg"
+                      size={{ base: "md", md: "lg" }}
                     />
                   </FormControl>
 
@@ -258,7 +310,7 @@ const TransactionArea = ({ onTransactionAdd }) => {
                       name="tag"
                       value={newTransaction.tag}
                       onChange={handleInputChange}
-                      size="lg"
+                      size={{ base: "md", md: "lg" }}
                     >
                       <option value="">Select category</option>
                       {getTransactionTags(type).map(({ value, label }) => (
@@ -269,11 +321,11 @@ const TransactionArea = ({ onTransactionAdd }) => {
 
                   <Button
                     colorScheme="brand"
-                    size="lg"
+                    size={{ base: "md", md: "lg" }}
                     onClick={() => handleSubmit(type)}
                     leftIcon={<Icon as={transactionTypes.find(t => t.type === type).icon} />}
                   >
-                    Add {type.charAt(0).toUpperCase() + type.slice(1)} Transaction
+                    Add {type.charAt(0).toUpperCase() + type.slice(1)}
                   </Button>
                 </VStack>
               </TabPanel>
@@ -281,16 +333,37 @@ const TransactionArea = ({ onTransactionAdd }) => {
           </TabPanels>
         </Tabs>
 
-        {/* Transaction History - Matching TaskManager styling */}
+        {/* Transaction History - Responsive version */}
         <VStack spacing={4} align="stretch">
           <Heading size="md">Transaction History</Heading>
           
+          {/* Mobile view - Card list */}
+          <Box display={{ base: 'block', md: 'none' }}>
+            {transactions.length === 0 ? (
+              <Box textAlign="center" py={8}>
+                <VStack spacing={3}>
+                  <Icon as={FaMoneyBillWave} boxSize={8} color="gray.400" />
+                  <Text color="gray.500">No transactions found</Text>
+                  <Text color="gray.400" fontSize="sm">
+                    Add your first transaction using the form above
+                  </Text>
+                </VStack>
+              </Box>
+            ) : (
+              transactions.map((transaction) => (
+                <MobileTransactionItem key={transaction.id} transaction={transaction} />
+              ))
+            )}
+          </Box>
+
+          {/* Desktop view - Table */}
           <Box
             borderRadius="lg"
             borderWidth="1px"
             overflow="hidden"
             role="grid"
             tabIndex={0}
+            display={{ base: 'none', md: 'block' }}
             onFocus={() => {
               // Auto-select first transaction if none selected
               if (transactions.length && !selectedTransactionId) {

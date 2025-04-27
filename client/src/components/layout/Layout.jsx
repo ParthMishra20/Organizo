@@ -36,7 +36,7 @@ const Layout = ({ children }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   return (
-    <Box minH="100vh" bg={bgColor}>
+    <Box minH="100vh" bg={bgColor} overflow="hidden">
       {/* Mobile Sidebar */}
       <Sidebar isOpen={isOpen} onClose={onClose} />
       
@@ -49,6 +49,7 @@ const Layout = ({ children }) => {
         minH={minH}
         display="flex"
         flexDirection="column"
+        px={{ base: 2, sm: 4 }}
       >
         <AnimatePresence mode="wait">
           <MotionBox
@@ -60,6 +61,7 @@ const Layout = ({ children }) => {
             flex="1"
             display="flex"
             flexDirection="column"
+            width="100%"
           >
             {children}
           </MotionBox>
