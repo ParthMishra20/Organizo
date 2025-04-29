@@ -12,6 +12,16 @@ import theme from './theme';
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
+// Get the current domain for Clerk redirects
+const getBaseUrl = () => {
+  // In development, use localhost
+  if (import.meta.env.DEV) {
+    return 'http://localhost:5173';
+  }
+  // In production, use the deployed URL
+  return 'https://organizo-s7qr.onrender.com';
+};
+
 // Clerk appearance settings
 const appearance = {
   elements: {
@@ -90,10 +100,15 @@ const appearance = {
 };
 
 function App() {
+  const baseUrl = getBaseUrl();
+  
   return (
     <ClerkProvider 
       publishableKey={clerkPubKey}
       appearance={appearance}
+      redirectUrl={baseUrl}
+      signInUrl={`${baseUrl}/sign-in`}
+      signUpUrl={`${baseUrl}/sign-up`}
     >
       <ChakraProvider theme={theme}>
         <ColorModeScript initialColorMode={theme.config.initialColorMode} />

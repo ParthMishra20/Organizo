@@ -15,7 +15,7 @@ const supabase = createClient(
 // CORS configuration with flexible frontend URL support
 const allowedOrigins = [
   'http://localhost:5173', // Local development
-  'https://organizo-40s4.onrender.com', // Render production URL
+  'https://organizo-s7qr.onrender.com' // Updated Render production URL
 ];
 
 // Add production frontend URL if defined in environment variables
@@ -27,9 +27,12 @@ if (process.env.FRONTEND_URL) {
 
 // Middleware
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
     
     if (allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
@@ -47,9 +50,13 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
+// Enhanced request logging middleware
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path} - ${new Date().toISOString()}`);
+  console.log('Headers:', {
+    userId: req.headers['user-id'] || 'Not provided',
+    origin: req.headers.origin || 'Not provided'
+  });
   next();
 });
 
