@@ -15,6 +15,7 @@ const supabase = createClient(
 // CORS configuration with flexible frontend URL support
 const allowedOrigins = [
   'http://localhost:5173', // Local development
+  'https://organizo-40s4.onrender.com', // Render production URL
 ];
 
 // Add production frontend URL if defined in environment variables
