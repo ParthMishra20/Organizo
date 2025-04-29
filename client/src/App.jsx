@@ -1,5 +1,5 @@
 import { ChakraProvider, ColorModeScript, useToast } from '@chakra-ui/react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ClerkProvider, SignIn, SignUp } from '@clerk/clerk-react';
 import { useEffect } from 'react';
 import Layout from './components/layout/Layout';
@@ -12,6 +12,12 @@ import AuthWrapper from './components/auth/AuthWrapper';
 import theme from './theme';
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+// Get environment variables for Clerk redirects
+const signInUrl = import.meta.env.VITE_CLERK_SIGN_IN_URL || '/sign-in';
+const signUpUrl = import.meta.env.VITE_CLERK_SIGN_UP_URL || '/sign-up';
+const signInFallbackUrl = import.meta.env.VITE_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL || '/';
+const signUpFallbackUrl = import.meta.env.VITE_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL || '/';
 
 // Get the current domain for Clerk redirects
 const getBaseUrl = () => {
@@ -108,37 +114,88 @@ function AuthDebugger() {
     console.log('Auth debugger initialized');
     console.log('Current URL:', window.location.href);
     console.log('Base URL:', getBaseUrl());
+    console.log('Clerk redirect settings:', {
+      signInUrl,
+      signUpUrl,
+      signInFallbackUrl,
+      signUpFallbackUrl
+    });
     
-    // Check if Clerk is loaded properly
-    if (window.Clerk) {
-      console.log('Clerk is loaded');
-    } else {
-      console.log('Clerk is not loaded');
-      toast({
-        title: 'Authentication Error',
-        description: 'Failed to load authentication service. Please try refreshing the page.',
-        status: 'error',
-        duration: 9000,
-        isClosable: true,
-      });
+    // Check if Clerk is loaded properly with retry mechanism
+    const checkClerk = () => {
+      if (window.Clerk) {
+        console.log('Clerk is loaded');
+        return true;
+      }
+      return false;
+    };
+
+    // Initial check
+    if (!checkClerk()) {
+      // Set up retry mechanism in case Clerk is loading slowly
+      let retryCount = 0;
+      const maxRetries = 3;
+      const retryInterval = setInterval(() => {
+        retryCount++;
+        if (checkClerk() || retryCount >= maxRetries) {
+          clearInterval(retryInterval);
+          
+          if (!window.Clerk && retryCount >= maxRetries) {
+            console.error('Clerk failed to load after retries');
+            toast({
+              title: 'Authentication Error',
+              description: 'Failed to load authentication service. Please try refreshing the page.',
+              status: 'error',
+              duration: 9000,
+              isClosable: true,
+            });
+          }
+        }
+      }, 1000);
     }
   }, [toast]);
   
   return null;
 }
 
-function App() {
-  const baseUrl = getBaseUrl();
+// Wrapper component to provide navigation to Clerk
+function ClerkProviderWithNavigate({ children }) {
+  const navigate = useNavigate();
   
   return (
     <ClerkProvider 
       publishableKey={clerkPubKey}
       appearance={appearance}
-      navigate={(to) => window.location.href = to}
+      navigate={(to) => navigate(to)}
+      signInUrl={signInUrl}
+      signUpUrl={signUpUrl}
+      afterSignInUrl={signInFallbackUrl}
+      afterSignUpUrl={signUpFallbackUrl}
     >
+      {children}
+    </ClerkProvider>
+  );
+}
+
+function App() {
+  // Check if Clerk key is available
+  if (!clerkPubKey) {
+    console.error('Missing Clerk publishable key');
+    return (
       <ChakraProvider theme={theme}>
-        <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-        <Router>
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <h2>Configuration Error</h2>
+          <p>Authentication service configuration is missing. Please check your environment variables.</p>
+        </div>
+      </ChakraProvider>
+    );
+  }
+
+  return (
+    <ChakraProvider theme={theme}>
+      <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+      <Router>
+        <ClerkProviderWithNavigate>
           <AuthDebugger />
           <Routes>
             {/* Auth Routes */}
@@ -149,9 +206,8 @@ function App() {
                   <SignIn 
                     routing="path" 
                     path="/sign-in" 
-                    signUpUrl="/sign-up" 
-                    afterSignInUrl="/"
-                    redirectUrl={baseUrl}
+                    signUpUrl={signUpUrl}
+                    fallbackRedirectUrl={signInFallbackUrl}
                   />
                 </AuthLayout>
               } 
@@ -163,9 +219,8 @@ function App() {
                   <SignUp 
                     routing="path" 
                     path="/sign-up" 
-                    signInUrl="/sign-in" 
-                    afterSignUpUrl="/"
-                    redirectUrl={baseUrl}
+                    signInUrl={signInUrl}
+                    fallbackRedirectUrl={signUpFallbackUrl}
                   />
                 </AuthLayout>
               } 
@@ -191,9 +246,9 @@ function App() {
               }
             />
           </Routes>
-        </Router>
-      </ChakraProvider>
-    </ClerkProvider>
+        </ClerkProviderWithNavigate>
+      </Router>
+    </ChakraProvider>
   );
 }
 
