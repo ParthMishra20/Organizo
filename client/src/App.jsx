@@ -1,6 +1,7 @@
-import { ChakraProvider, ColorModeScript } from '@chakra-ui/react';
+import { ChakraProvider, ColorModeScript, useToast } from '@chakra-ui/react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ClerkProvider, SignIn, SignUp } from '@clerk/clerk-react';
+import { useEffect } from 'react';
 import Layout from './components/layout/Layout';
 import AuthLayout from './components/auth/AuthLayout';
 import Home from './pages/Home';
@@ -19,7 +20,7 @@ const getBaseUrl = () => {
     return 'http://localhost:5173';
   }
   // In production, use the deployed URL
-  return 'https://organizo-s7qr.onrender.com';
+  return window.location.origin;
 };
 
 // Clerk appearance settings
@@ -99,6 +100,33 @@ const appearance = {
   },
 };
 
+function AuthDebugger() {
+  const toast = useToast();
+  
+  useEffect(() => {
+    // Log auth debugging information
+    console.log('Auth debugger initialized');
+    console.log('Current URL:', window.location.href);
+    console.log('Base URL:', getBaseUrl());
+    
+    // Check if Clerk is loaded properly
+    if (window.Clerk) {
+      console.log('Clerk is loaded');
+    } else {
+      console.log('Clerk is not loaded');
+      toast({
+        title: 'Authentication Error',
+        description: 'Failed to load authentication service. Please try refreshing the page.',
+        status: 'error',
+        duration: 9000,
+        isClosable: true,
+      });
+    }
+  }, [toast]);
+  
+  return null;
+}
+
 function App() {
   const baseUrl = getBaseUrl();
   
@@ -106,13 +134,12 @@ function App() {
     <ClerkProvider 
       publishableKey={clerkPubKey}
       appearance={appearance}
-      redirectUrl={baseUrl}
-      signInUrl={`${baseUrl}/sign-in`}
-      signUpUrl={`${baseUrl}/sign-up`}
+      navigate={(to) => window.location.href = to}
     >
       <ChakraProvider theme={theme}>
         <ColorModeScript initialColorMode={theme.config.initialColorMode} />
         <Router>
+          <AuthDebugger />
           <Routes>
             {/* Auth Routes */}
             <Route 
@@ -124,6 +151,7 @@ function App() {
                     path="/sign-in" 
                     signUpUrl="/sign-up" 
                     afterSignInUrl="/"
+                    redirectUrl={baseUrl}
                   />
                 </AuthLayout>
               } 
@@ -137,6 +165,7 @@ function App() {
                     path="/sign-up" 
                     signInUrl="/sign-in" 
                     afterSignUpUrl="/"
+                    redirectUrl={baseUrl}
                   />
                 </AuthLayout>
               } 
